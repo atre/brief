@@ -1,0 +1,27 @@
+{
+  "name": "brief",
+  "version": "0.2.0",
+  "description": "Cross-repo state radar for a many-repo workspace — where was I, what's half-done, what drifted; a fresh-session handoff per repo",
+  "type": "module",
+  "bin": { "brief": "./dist/index.js" },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "prepare": "npm run build",
+    "prelink": "npm run build",
+    "test": "tsc -p tsconfig.test.json && node --test test-dist/test/*.test.js",
+    "lint": "tsc --noEmit",
+    "report": "mkdir -p reports && node dist/index.js --md > reports/$(date +%G-W%V).md"
+  },
+  "keywords": ["git", "workspace", "claude-code", "handoff", "cli", "devx"],
+  "license": "MIT",
+  "private": true,
+  "author": "Mykyta Herashchenko",
+  "files": ["dist", "skills"],
+  "repository": { "type": "git", "url": "git+https://github.com/atre/brief.git" },
+  "homepage": "https://github.com/atre/brief#readme",
+  "bugs": { "url": "https://github.com/atre/brief/issues" },
+  "engines": { "node": ">=20.0.0" },
+  "devDependencies": { "@types/node": "^25.5.0", "typescript": "^5.9.3" }
+}
