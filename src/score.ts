@@ -63,6 +63,15 @@ export function score(r: Repo, now: number, staleDays = 7): { score: number; rea
     s += Math.min(r.deadPaths.length, 5);
     why.push(`CLAUDE.md: ${r.deadPaths.length} dead paths`);
   }
+  // A doc every session reads is a tax every session pays; over budget it is
+  // worth one line of attention until someone splits it.
+  const fat = r.fatDocs ?? [];
+  if (fat.length) {
+    s += Math.min(fat.length * 2, 6);
+    const f = fat[0];
+    const kb = f.bytes >= 1_000_000 ? `${(f.bytes / 1_048_576).toFixed(1)} MB` : `${Math.round(f.bytes / 1024)} KB`;
+    why.push(`${f.file} ${kb}` + (fat.length > 1 ? ` +${fat.length - 1} fat docs` : ' (read every session)'));
+  }
   if (r.runtime === 'crit') {
     s += 6;
     why.push('runtime ✗');

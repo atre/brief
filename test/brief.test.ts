@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { discover } from '../src/discover.js';
-import { firstParagraph, extractNext, feedbackInfo, docInfos } from '../src/docs.js';
+import { firstParagraph, extractNext, fatDocs, feedbackInfo, feedbackSections, docInfos } from '../src/docs.js';
 import { gitInfo } from '../src/git.js';
 import { score } from '../src/score.js';
 import { tableNames, hubDiff, applyHubWrite } from '../src/hub.js';
@@ -84,12 +84,12 @@ test('extractNext: heading bullets first, then open checkboxes; Next.js is not a
   assert.deepEqual(extractNext('- [ ] only\n- bullet', 5, false).next, ['only']);
 });
 
-test('feedbackInfo: sections dated after the plan are untriaged', () => {
+test('feedbackInfo: no triage marker → every dated section is untriaged; undated only without a plan', () => {
   const root = mkdtempSync(join(tmpdir(), 'brief-'));
   writeFileSync(join(root, 'FEEDBACK.md'), '# fb\n## 2026-08-01 — old\n- a\n## 2026-08-15 — new\n- b\n## undated\n- c\n');
   const fi = feedbackInfo(root, Date.parse('2026-08-10'))!;
   assert.equal(fi.sections, 3);
-  assert.deepEqual(fi.untriaged, ['2026-08-15 — new']);
+  assert.deepEqual(fi.untriaged, ['2026-08-01 — old', '2026-08-15 — new']);
   const none = feedbackInfo(root, 0)!;
   assert.deepEqual(none.untriaged, ['2026-08-01 — old', '2026-08-15 — new', 'undated']);
   assert.equal(feedbackInfo(join(root, 'nope'), 0), null);
@@ -259,6 +259,20 @@ test('feedback: triage marker and same-day rule', () => {
   assert.deepEqual(feedbackInfo(root, Date.parse('2026-08-15T20:00:00'))!.untriaged, ['2026-08-15 — b']);
   // no plan at all → everything after the triage marker
   assert.deepEqual(feedbackInfo(root, 0)!.untriaged, ['2026-08-15 — b']);
+});
+
+test('feedback: preview trims at word boundary, hard cut only when no space is near', () => {
+  // 199 chars of "aaaaaaaaa " blocks → last space inside the 159-char head is at 149 (≥ 144 window) → word cut
+  const wordy = 'aaaaaaaaa '.repeat(20).trim();
+  const s1 = feedbackSections(`## 2026-08-20 — a\n- ${wordy}\n`);
+  assert.equal(s1[0].preview, `${'aaaaaaaaa '.repeat(15).trimEnd()}…`);
+  assert.equal(s1[0].preview.length, 150); // never wider than the old 160 cap
+  // one unbroken 200-char token → no space in the tail window → same hard cut as before
+  const s2 = feedbackSections(`## 2026-08-20 — b\n- ${'b'.repeat(200)}\n`);
+  assert.equal(s2[0].preview, `${'b'.repeat(159)}…`);
+  // at or under the cap → untouched
+  const s3 = feedbackSections(`## 2026-08-20 — c\n- ${'c'.repeat(160)}\n`);
+  assert.equal(s3[0].preview, 'c'.repeat(160));
 });
 
 test('feedback: --lessons finds "- lesson:" bullets in any section, triaged or not', () => {
@@ -503,7 +517,7 @@ test('sessions: lastAssistantText skips a trailing tool_use-only record', () => 
   assert.deepEqual(lastAssistantTail(file), { text: 'Stopped at step 3; lint still red', turns: 1 });
   const repo: Repo = {
     name: 'r', path: '/r', description: '', docs: [], feedback: null, git: null,
-    sessions: { last: NOW, count7d: 1 }, snuff: false, deadPaths: [], score: 0, reasons: [],
+    sessions: { last: NOW, count7d: 1 }, snuff: false, deadPaths: [], fatDocs: [], score: 0, reasons: [],
     lastSaid: { text: 'Stopped at step 3; lint still red', ts: NOW, turns: 4 },
   };
   assert.match(renderRepo(repo, NOW, { files: 10, commits: 3, next: 3 }), /last session said: Stopped at step 3.*\(1min, 4 turns\)/);
@@ -549,7 +563,7 @@ test('git: unpushedSince from the oldest unpushed commit; score/radar show the a
   assert.equal(g.unpushedSince, Date.parse(commitDate));
   const repo: Repo = {
     name: 'r', path: dir, description: '', docs: [], feedback: null, git: g,
-    sessions: { last: 0, count7d: 0 }, snuff: false, deadPaths: [], score: 0, reasons: [],
+    sessions: { last: 0, count7d: 0 }, snuff: false, deadPaths: [], fatDocs: [], score: 0, reasons: [],
   };
   const s = score(repo, NOW);
   assert.ok(s.reasons.includes('unpushed 4d'));
@@ -575,4 +589,27 @@ test('cli: --brief defaults top to 3, --top overrides', () => {
   const home = '/home/t';
   assert.equal(parseArgs(['--brief'], home).top, 3);
   assert.equal(parseArgs(['--brief', '--top', '5'], home).top, 5);
+});
+
+test('fatDocs: the docs every session reads, over their byte budget — CLAUDE.md strictest', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'brief-fat-'));
+  writeFileSync(join(dir, 'CLAUDE.md'), 'x'.repeat(9_000));
+  writeFileSync(join(dir, 'STATE.md'), 'x'.repeat(40_000));
+  writeFileSync(join(dir, 'PLAN.md'), 'x'.repeat(1_000));
+  writeFileSync(join(dir, 'STATE-archive.md'), 'x'.repeat(900_000)); // the fix, not an offender
+  const fat = fatDocs(dir, [{ file: 'STATE.md' }, { file: 'PLAN.md' }, { file: 'STATE-archive.md' }]);
+  assert.deepEqual(fat.map((f) => f.file), ['STATE.md', 'CLAUDE.md']); // biggest overrun first
+  assert.equal(fat.find((f) => f.file === 'CLAUDE.md')?.budget, 8_000);
+  // a repo with none of them is silent
+  const clean = mkdtempSync(join(tmpdir(), 'brief-lean-'));
+  writeFileSync(join(clean, 'CLAUDE.md'), 'x'.repeat(2_000));
+  assert.deepEqual(fatDocs(clean, [{ file: 'STATE.md' }]), []);
+
+  const repo: Repo = {
+    name: 'r', path: dir, description: '', docs: [], feedback: null, git: null,
+    sessions: { last: NOW, count7d: 1 }, snuff: false, deadPaths: [], fatDocs: fat, score: 0, reasons: [],
+  };
+  const { score: s2, reasons } = score(repo, NOW);
+  assert.equal(s2, 4);
+  assert.match(reasons.join(' '), /STATE\.md 39 KB \+1 fat docs/);
 });

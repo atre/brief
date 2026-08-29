@@ -60,6 +60,41 @@ export function isPathCandidate(raw: string): boolean {
   return /^[a-z._]/.test(raw); // relative, lowercase-led (`Word/x` reads as prose)
 }
 
+/** Byte budgets for the docs a session reads whether or not it needs them.
+ *  CLAUDE.md is the strict one: it is resident in EVERY turn, so its size is
+ *  multiplied by the turn count, not by the session count (measured with
+ *  `tally files`: a 22 KB CLAUDE.md cost ~30M cache-read tokens in one week of
+ *  one repo). A state doc is read once per session and then rides along, so it
+ *  gets a looser budget. Both are cheap to fix — split the head from the log —
+ *  which is why this is an attention signal and not just trivia. */
+export const DOC_BUDGET: Record<string, number> = { 'CLAUDE.md': 8_000, __state__: 30_000 };
+
+export interface FatDoc {
+  file: string;
+  bytes: number;
+  budget: number;
+}
+
+/** State/plan/CLAUDE docs that are over budget, biggest overrun first. */
+export function fatDocs(dir: string, docs: { file: string }[]): FatDoc[] {
+  const out: FatDoc[] = [];
+  const check = (file: string, budget: number) => {
+    try {
+      const bytes = statSync(join(dir, file)).size;
+      if (bytes > budget) out.push({ file, bytes, budget });
+    } catch {
+      // not present — nothing to charge
+    }
+  };
+  check('CLAUDE.md', DOC_BUDGET['CLAUDE.md']);
+  for (const d of docs) {
+    // an -archive.md sibling is the fix, not another offender: it is never read whole
+    if (/-archive\.md$/i.test(d.file)) continue;
+    check(d.file, DOC_BUDGET.__state__);
+  }
+  return out.sort((a, b) => b.bytes - a.bytes);
+}
+
 /** Backticked paths in CLAUDE.md that no longer resolve on disk, capped at 5.
  *  Relative paths resolve against the repo root, else against any subdir (depth ≤ 4: `lib/db/x.ts`
  *  under `src/`, `__tests__/` colocated); bare filenames the same way; `~/` and `/Users/` paths
@@ -226,16 +261,22 @@ export async function docInfos(dir: string, isGit: boolean, cfg: { stateDoc?: st
     const mtime = fsm > touched.ts ? fsm : touched.ts;
     const { open, done, next } = extractNext(text, 5, cue);
     const commitsBehind = isGit ? await commitsSince(dir, touched.hash) : 0;
-    out.push({ file, mtime, open, done, next, commitsBehind });
+    const nextHeadingMissing = cfg.nextHeading && !text.split('\n').some((l) => cue.test(l)) ? cfg.nextHeading : undefined;
+    out.push({ file, mtime, open, done, next, commitsBehind, ...(nextHeadingMissing ? { nextHeadingMissing } : {}) });
   }
   return out;
 }
 
 const DATE_RE = /(\d{4}-\d{2}-\d{2})/;
+const TRIAGE_MARKER = /^\d{4}-\d{2}-\d{2}\s+[—–-]+\s+triage\b/i;
 
-function localDay(ms: number): string {
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+/** Trim to the 160-char preview budget, cutting at the last word boundary within the
+ *  final 15 chars of the cap instead of mid-word; hard cut when no space is that near. */
+function trimPreview(t: string): string {
+  if (t.length <= 160) return t;
+  const head = t.slice(0, 159);
+  const sp = head.lastIndexOf(' ');
+  return sp >= 144 ? `${head.slice(0, sp).trimEnd()}…` : `${head}…`;
 }
 
 /** Split FEEDBACK.md into `## ` sections with a one-line preview each. */
@@ -252,7 +293,7 @@ export function feedbackSections(text: string): FeedbackSection[] {
     }
     if (cur && !cur.preview) {
       const t = raw.replace(/^\s*[-*]\s+/, '').replace(/\*\*/g, '').trim();
-      if (t) cur.preview = t.length > 160 ? `${t.slice(0, 159)}…` : t;
+      if (t) cur.preview = trimPreview(t);
     }
   }
   return out;
@@ -274,11 +315,8 @@ export function extractLessons(text: string): { ts: number; text: string }[] {
   return out;
 }
 
-/** FEEDBACK.md sections are untriaged unless an explicit `## … — triage` marker section
- *  follows them, or they clearly predate the plan's last touch (day granularity — headers
- *  carry dates, not times, so a same-day section can't be ordered against `planMtime` and
- *  defaults to untriaged rather than risking an unrelated same-day PLAN.md edit silently
- *  hiding real feedback). */
+/** Sections after the last "## <date> — triage" marker are untriaged whatever
+ *  PLAN.md's mtime; undated sections only when there is no plan doc at all. */
 export function feedbackInfo(dir: string, planMtime: number): FeedbackInfo | null {
   const fbPath = join(dir, 'FEEDBACK.md');
   const text = readIf(fbPath);
@@ -286,13 +324,10 @@ export function feedbackInfo(dir: string, planMtime: number): FeedbackInfo | nul
   const sections = feedbackSections(text);
   const lessons = extractLessons(text);
   // a "triage" section marks everything before it as handled
-  const lastTriage = sections.map((s) => /\btriage/i.test(s.header)).lastIndexOf(true);
-  const planDay = planMtime ? localDay(planMtime) : '';
+  const lastTriage = sections.map((s) => TRIAGE_MARKER.test(s.header)).lastIndexOf(true);
   const items = sections.filter((s, i) => {
     if (i <= lastTriage) return false;
-    if (!s.ts) return !planMtime; // undated: untriaged only when there is no plan at all
-    const day = localDay(s.ts + 12 * 3_600_000);
-    return !planDay || day >= planDay;
+    return s.ts ? true : !planMtime;
   });
   return { sections: sections.length, untriaged: items.map((s) => s.header), items, lessons };
 }

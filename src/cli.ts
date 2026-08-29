@@ -17,6 +17,8 @@ export interface Args {
   brief: boolean;
   lessons: boolean;
   next: boolean;
+  visibility?: 'public' | 'private';
+  refreshVisibility: boolean;
 }
 
 export const HELP = `brief — cross-repo state radar
@@ -27,7 +29,8 @@ usage
   brief <repo> --next        print the repo's first open PLAN.md item (path:line + text), exit 1 if none
   brief --hub [file]         diff discovered repos vs the hub CLAUDE.md table (default ~/git/hub/CLAUDE.md)
   brief --hub [file] --write append missing repos as rows above the "No index yet" row (curated rows untouched)
-  brief feedback             untriaged FEEDBACK.md sections across all repos, with a preview line each
+  brief feedback             untriaged FEEDBACK.md sections across all repos, with a preview line each (a FEEDBACK.md with no "## <date>" sections is ignored, not an error)
+  brief feedback --public    only repos whose origin is a public GitHub repo (--private: the inverse; --refresh-visibility re-asks gh, else cached 7d)
   brief feedback --lessons   "- lesson: …" bullets across all repos (any section, triaged or not)
   brief queue                repos whose PLAN/state doc is agent-runnable: <repo> PLAN d/n ↳ next item
   brief snap [name]          write a workspace snapshot to ~/.brief/snaps/<name>.json (default "last")
@@ -71,6 +74,7 @@ export function parseArgs(argv: string[], home: string): Args {
     brief: false,
     lessons: false,
     next: false,
+    refreshVisibility: false,
   };
   let topGiven = false;
   const positional: string[] = [];
@@ -92,6 +96,13 @@ export function parseArgs(argv: string[], home: string): Args {
       topGiven = true;
     } else if (x === '--brief') a.brief = true;
     else if (x === '--lessons') a.lessons = true;
+    else if (x === '--public') {
+      if (a.visibility && a.visibility !== 'public') throw new Error('use one of --public / --private');
+      a.visibility = 'public';
+    } else if (x === '--private') {
+      if (a.visibility && a.visibility !== 'private') throw new Error('use one of --public / --private');
+      a.visibility = 'private';
+    } else if (x === '--refresh-visibility') a.refreshVisibility = true;
     else if (x === '--next') a.next = true;
     else if (x === '--all') a.all = true;
     else if (x === '--only') a.only = next();
@@ -126,6 +137,8 @@ export function parseArgs(argv: string[], home: string): Args {
   if (a.gates && a.cmd !== 'repo') throw new Error('--gates is only valid for `brief <repo>`');
   if (a.lessons && a.cmd !== 'feedback') throw new Error('--lessons is only valid for `brief feedback`');
   if (a.next && a.cmd !== 'repo') throw new Error('--next is only valid for `brief <repo>`');
+  if ((a.visibility || a.refreshVisibility) && a.cmd !== 'feedback')
+    throw new Error('--public/--private/--refresh-visibility are only valid with `brief feedback`');
   if (a.brief && !topGiven) a.top = 3;
   return a;
 }

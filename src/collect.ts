@@ -5,7 +5,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { discover } from './discover.js';
 import { gitInfo } from './git.js';
-import { describe, docInfos, feedbackInfo, extractNext, readIf, deadPaths } from './docs.js';
+import { describe, docInfos, fatDocs, feedbackInfo, extractNext, readIf, deadPaths } from './docs.js';
 import { indexSessions, sessionsFor, newestTranscript, lastAssistantTail } from './sessions.js';
 import { score } from './score.js';
 import { readConfig } from './config.js';
@@ -81,6 +81,7 @@ export async function collectOne(
     sessions: sessionsFor(sessionsIdx, path),
     snuff: existsSync(join(path, 'snuff.yaml')),
     deadPaths: claudeMd ? deadPaths(path, claudeMd) : [],
+    fatDocs: fatDocs(path, docs),
     score: 0,
     reasons: [],
   };

@@ -6,8 +6,7 @@ import { join } from 'node:path';
  *    nextHeading: Open items           # heading cue for "next" (substring, case-insensitive)
  *    description: one line             # override the README/CLAUDE.md pick
  *    ignore: true                      # drop the repo from the radar entirely
- *    service: app/svc-a                # pulse finding id suffix this repo owns (k8s:/cron:/site:)
- *                                       # comma-separated for multiple ids; trailing `*` = prefix match
+ *    service: app/svc-a                # pulse finding id this repo owns — bare (`app/svc-a`, any kind) or kinded (`node:*`); comma list; trailing `*` = prefix
  *                                       # (e.g. `worker-b/svc-1, worker-b/job-*`)
  *    agentRunnable: true               # force `brief queue` to list this repo (else: state doc has the marker)
  */

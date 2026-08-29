@@ -30,7 +30,7 @@ brief svc-a --next        # just the repo's first open PLAN.md item ("PLAN.md:7"
 brief svc-a --gates       # handoff + live `snuff --json --changed` → "gates: ✓ 3/3" / "gates: ✗ 1/3 — lint" (repo command only)
 brief --hub               # diff discovered repos vs ~/git/hub/CLAUDE.md table
 brief --hub --write       # append missing repos as rows above the "No index yet" row (curated rows untouched)
-brief feedback            # every untriaged FEEDBACK.md section across repos, one preview line each
+brief feedback            # every untriaged FEEDBACK.md section across repos, one preview line each (a FEEDBACK.md with no "## <date>" sections is ignored, not an error)
 brief feedback --lessons  # "- lesson: …" bullets across all repos, any section · --md for a table for LESSONS.md
 brief queue               # repos whose PLAN/state doc is agent-runnable: <repo> PLAN d/n ↳ next item · --json
 brief snap [name]         # write a workspace snapshot to ~/.brief/snaps/<name>.json (default "last")
@@ -83,7 +83,7 @@ recent commits:
 | description | first real paragraph of README.md, else CLAUDE.md (agent boilerplate skipped) |
 | primary state doc + "next" | first of `STATE.md · STATUS.md · TODO.md · PLAN.md`: bullets under a `## Next`/`resume`/`now`/`todo` heading, else open `- [ ]` items, else CLAUDE.md checkboxes |
 | doc drift | commits on HEAD after the commit that last touched the state doc (`Nc stale`) |
-| untriaged feedback | `FEEDBACK.md` `## <date>` sections after PLAN.md's last-touch day (same day counts when FEEDBACK.md was written later); a `## … triage` section marks everything before it handled |
+| untriaged feedback | `FEEDBACK.md` `## <date>` sections after the last `## <date> — triage` marker (all dated sections when there is no marker; a header-only file is ignored) |
 | sessions | Claude Code transcripts (`~/.claude/projects`, `~/.claude-dev/projects`; env `BRIEF_PROJECTS`) — count in 7d, last |
 | snuff | `snuff.yaml` present |
 | dead CLAUDE.md paths | backticked paths in CLAUDE.md that no longer resolve, capped at 5 — relative paths tried at the root, then anywhere in the tree (depth ≤ 4); `~/`, `/Users/` paths checked as-is; CIDRs, regexes, URL paths, flag pairs, `Next.js`-style names, runtime `*.json` never count |
@@ -118,7 +118,7 @@ service: app/svc-a              # pulse finding id this repo owns (k8s:<ns>/<nam
 
 - Hub / workspace repo `SessionStart` hook: `brief --brief` — top 3, 2 lines/repo, hard-capped at 15 lines total, the radar lands where the day starts without blowing the hook budget.
 - Per repo: `brief init` wires `brief . --tokens 800` as a SessionStart hook — the handoff is on screen before the first prompt (keep STATE.md for the *why*; brief does the *what*).
-- `brief feedback` is the consumer for append-only FEEDBACK.md files: triage, then touch PLAN.md (or add a `## <date> — triage` section) and they drop off.
+- `brief feedback` is the consumer for append-only FEEDBACK.md files: triage, then add a `## <date> — triage` section and everything above it drops off (touching PLAN.md no longer hides anything).
 - `npm run report` (or the `/weekly` skill) writes `reports/YYYY-WW.md` in this repo — the Monday view; no scheduler in code, invoked by hand.
 - Skills in `skills/`: `brief` (the CLI), plus composition skills `start` (session kickoff across the fleet), `triage` (FEEDBACK → PLAN/LESSONS), `weekly` (reports/YYYY-WW.md) — symlink each into `~/.claude/skills/`.
 

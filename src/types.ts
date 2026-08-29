@@ -20,6 +20,7 @@ export interface DocInfo {
   next: string[]; // best-effort "what's next" lines
   nextSource?: string; // set when `next` was borrowed from another file (CLAUDE.md fallback)
   commitsBehind: number; // commits to HEAD since the doc was last touched
+  nextHeadingMissing?: string; // .brief.yaml nextHeading that matched no heading in this doc
 }
 
 export interface FeedbackSection {
@@ -30,7 +31,7 @@ export interface FeedbackSection {
 
 export interface FeedbackInfo {
   sections: number; // "## " sections total
-  untriaged: string[]; // section headers newer than the plan doc (or all, if no plan)
+  untriaged: string[]; // section headers after the last "## <date> — triage" marker (all dated ones, if no marker)
   items: FeedbackSection[]; // the untriaged ones, with previews
   lessons: { ts: number; text: string }[]; // "- lesson: …" bullets, any section, triaged or not
 }
@@ -52,7 +53,9 @@ export interface Repo {
   gates?: { ok: boolean; red: string[]; passed: number; total: number; ts?: number } | null; // live via `--gates`, else cached `~/.snuff/<slug>.json` / `<repo>/.snuff/last.json`; total excludes skipped
   tokens7d?: number; // last-7d tokens (input+output+cacheCreate) via `tally --json`, when tally is on PATH
   deadPaths: string[]; // backticked paths in CLAUDE.md that don't resolve, capped at 5
+  fatDocs?: import('./docs.js').FatDoc[]; // always-read docs over their byte budget — context tax on every session
   runtime?: 'ok' | 'warn' | 'crit'; // pulse's last snapshot, when `.brief.yaml service:` is set
+  visibility?: 'public' | 'private' | 'local' | 'unknown'; // feedback only, cached 7d in $BRIEF_HOME/visibility.json
   lastSaid?: { text: string; ts: number; turns?: number }; // last session's final assistant text — handoff only, never the radar; turns only when the whole transcript was read
   score: number;
   reasons: string[]; // why it scored, short tags

@@ -24,16 +24,18 @@ export function readPulseLast(home = process.env.BRIEF_PULSE_HOME ?? join(homedi
 
 const RANK: Record<string, number> = { ok: 0, warn: 1, crit: 2 };
 
-/** Worst severity among findings matching one service id. A trailing `*` (`worker-b/job-*`)
- *  matches by prefix (for repos that own a family of cron ids); otherwise a finding matches
- *  when its id is exactly `k8s:/cron:/site:<id>` or namespaced one level deeper (`<id>:pod1`). */
+/** Worst severity among findings matching one service id. Bare ids (`app/svc-a`) match a
+ *  finding of any kind (`k8s:`, `cron:`, `site:`, `pvc:`, `node:`, `disk:`, `host:`); ids
+ *  written with a kind prefix (`node:*`) match that kind only. A trailing `*` matches by
+ *  prefix (for repos that own a family of cron ids). */
 function runtimeForOne(id: string, findings: PulseFinding[]): 'ok' | 'warn' | 'crit' {
   const wildcard = id.endsWith('*');
   const base = wildcard ? id.slice(0, -1) : id;
-  const prefixes = ['k8s:', 'cron:', 'site:'].map((p) => `${p}${base}`);
+  const kinded = /^[a-z0-9]+:/i.test(base);
   let worst: 'ok' | 'warn' | 'crit' = 'ok';
   for (const f of findings) {
-    const hit = wildcard ? prefixes.some((p) => f.id.startsWith(p)) : prefixes.some((p) => f.id === p || f.id.startsWith(`${p}:`));
+    const target = kinded ? f.id : f.id.replace(/^[a-z0-9]+:/i, '');
+    const hit = wildcard ? target.startsWith(base) : target === base || target.startsWith(`${base}:`);
     if (!hit) continue;
     if ((RANK[f.severity] ?? 0) > RANK[worst]) worst = f.severity as 'ok' | 'warn' | 'crit';
   }

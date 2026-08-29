@@ -100,6 +100,7 @@ export function renderRepo(r: Repo, now: number, budget: { files: number; commit
   } else out.push('docs: none of STATE/STATUS/TODO/PLAN.md');
   if (r.deadPaths.length) out.push(`dead paths: ${r.deadPaths.join(', ')}`);
   const primary = r.docs[0];
+  if (primary?.nextHeadingMissing) out.push(`next (${primary.file}): nextHeading "${primary.nextHeadingMissing}" not found`);
   if (primary?.next.length) {
     out.push(`next (${primary.nextSource ?? primary.file}):`);
     for (const n of primary.next.slice(0, budget.next)) out.push(`  - ${n}`);
@@ -196,11 +197,11 @@ export function renderLessonsMd(rep: Report): string {
 export function renderFeedback(rep: Report): string {
   const withFb = rep.repos.filter((r) => r.feedback?.items.length).sort((a, b) => b.feedback!.items.length - a.feedback!.items.length);
   const total = withFb.reduce((n, r) => n + r.feedback!.items.length, 0);
-  const out = [`feedback — ${total} untriaged sections in ${withFb.length} repos (newer than each repo's PLAN.md)`];
+  const out = [`feedback — ${total} untriaged sections in ${withFb.length} repos (after each repo's last "## <date> — triage" marker)`];
   for (const r of withFb) {
-    out.push(`${r.name} (${r.feedback!.items.length}) — ${r.path}/FEEDBACK.md`);
+    out.push(`${r.name} (${r.feedback!.items.length})${r.visibility === 'public' || r.visibility === 'private' ? ` [${r.visibility}]` : ''} — ${r.path}/FEEDBACK.md`);
     for (const it of r.feedback!.items) out.push(`  · ${it.header}${it.preview ? `\n      ${it.preview}` : ''}`);
   }
-  if (!withFb.length) out.push('nothing untriaged — every dated section predates its PLAN.md');
+  if (!withFb.length) out.push('nothing untriaged — every dated section sits above a triage marker');
   return out.join('\n');
 }

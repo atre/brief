@@ -13,6 +13,7 @@ import { hubDiff, applyHubWrite } from './hub.js';
 import { discover } from './discover.js';
 import { readConfig } from './config.js';
 import { readIf, nextItem } from './docs.js';
+import { attachVisibility, briefHome } from './visibility.js';
 
 const pkg = createRequire(import.meta.url)('../package.json') as { version: string };
 
@@ -83,8 +84,13 @@ async function main(): Promise<void> {
       if (args.json) return void console.log(JSON.stringify(rep.repos.flatMap((r) => r.feedback?.lessons.map((l) => ({ repo: r.name, ...l })) ?? []), null, 2));
       return void console.log(args.md ? renderLessonsMd(rep) : renderLessons(rep));
     }
-    if (args.json) return void console.log(JSON.stringify(rep.repos.filter((r) => r.feedback?.items.length).map((r) => ({ name: r.name, path: r.path, items: r.feedback!.items })), null, 2));
-    return void console.log(renderFeedback(rep));
+    await attachVisibility(rep.repos.filter((r) => r.feedback?.items.length), { home: briefHome(), now, refresh: args.refreshVisibility });
+    const view = { ...rep, repos: args.visibility ? rep.repos.filter((r) => r.visibility === args.visibility) : rep.repos };
+    if (args.json)
+      return void console.log(
+        JSON.stringify(view.repos.filter((r) => r.feedback?.items.length).map((r) => ({ name: r.name, path: r.path, visibility: r.visibility, items: r.feedback!.items })), null, 2),
+      );
+    return void console.log(renderFeedback(view));
   }
   if (args.cmd === 'hub') {
     const file = args.hubFile ?? `${home}/git/hub/CLAUDE.md`;
