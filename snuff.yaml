@@ -11,3 +11,7 @@ gates:
     run: npm run build
     needs: [lint]
     paths: [src/**, tsconfig.json, package.json]
+  - name: secrets
+    run: gitleaks git . --no-banner --redact
+    paths: ['**']
+    requires: [gitleaks]
