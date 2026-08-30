@@ -55,6 +55,7 @@ export interface Repo {
   deadPaths: string[]; // backticked paths in CLAUDE.md that don't resolve, capped at 5
   fatDocs?: import('./docs.js').FatDoc[]; // always-read docs over their byte budget — context tax on every session
   runtime?: 'ok' | 'warn' | 'crit'; // pulse's last snapshot, when `.brief.yaml service:` is set
+  ci?: import('./ci.js').CiResult; // latest GitHub Actions run for the current branch, cached 1h in $BRIEF_HOME/ci.json
   visibility?: 'public' | 'private' | 'local' | 'unknown'; // feedback only, cached 7d in $BRIEF_HOME/visibility.json
   lastSaid?: { text: string; ts: number; turns?: number }; // last session's final assistant text — handoff only, never the radar; turns only when the whole transcript was read
   score: number;

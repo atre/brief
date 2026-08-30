@@ -59,14 +59,28 @@ async function main(): Promise<void> {
       console.log(item.text);
       return;
     }
-    const repo = await collectOne(nameFor(path, args.roots), path, now, undefined, args.stale, { ...(args.gates ? { gates: runSnuff } : {}), lastSaid: true });
+    const repo = await collectOne(nameFor(path, args.roots), path, now, undefined, args.stale, {
+      ...(args.gates ? { gates: runSnuff } : {}),
+      lastSaid: true,
+      refreshCi: args.refreshCi,
+      noCi: args.noCi,
+    });
     if (!repo) throw new Error(`${path} is ignored by its .brief.yaml`);
     if (args.json) return void console.log(JSON.stringify(repo, null, 2));
     const budget = budgetFor(args.tokens ?? 1200);
     return void console.log(renderRepo(repo, now, budget));
   }
 
-  const rep = await collect({ roots: args.roots, docsRoots: args.docsRoots, exclude: args.exclude, now, only: args.only, staleDays: args.stale });
+  const rep = await collect({
+    roots: args.roots,
+    docsRoots: args.docsRoots,
+    exclude: args.exclude,
+    now,
+    only: args.only,
+    staleDays: args.stale,
+    refreshCi: args.refreshCi,
+    noCi: args.noCi,
+  });
   if (args.cmd === 'snap') {
     const file = writeSnap(rep, args.target ?? 'last');
     return void console.log(`brief snap: wrote ${rep.repos.length} repos to ${file}`);

@@ -28,6 +28,8 @@ brief                     # radar: every repo under ~/git ranked by attention (t
 brief svc-a               # handoff for one repo (name, "acme/foo", or a path)
 brief svc-a --next        # just the repo's first open PLAN.md item ("PLAN.md:7" + text), exit 1 if none
 brief svc-a --gates       # handoff + live `snuff --json --changed` → "gates: ✓ 3/3" / "gates: ✗ 1/3 — lint" (repo command only)
+brief --no-ci             # skip GitHub Actions probing entirely (env BRIEF_NO_CI=1)
+brief --refresh-ci        # re-probe CI state instead of using the cached (≤1h) result
 brief --hub               # diff discovered repos vs ~/git/hub/CLAUDE.md table
 brief --hub --write       # append missing repos as rows above the "No index yet" row (curated rows untouched)
 brief feedback            # every untriaged FEEDBACK.md section across repos, one preview line each (a FEEDBACK.md with no "## <date>" sections is ignored, not an error)
@@ -90,6 +92,7 @@ recent commits:
 | gates | snuff's last result: `~/.snuff/<slug>.json`, else the in-repo `<repo>/.snuff/last.json` snuff writes today (ISO `ts`, `gates[].gate.name` — both shapes accepted); `--gates` runs snuff live for one repo |
 | runtime | pulse's last snapshot (`~/.pulse/snaps/last.json`) joined on `.brief.yaml service:` — ids `k8s:<ns>/<name>`, `cron:<ns>/<name>`, `site:<url>` matched exactly; `pvc:`/`node:`/`host:`/`disk:` findings are not repo-attributable and never join |
 | PLAN progress | `PLAN d/total` from PLAN.md checkboxes; its first open item backs `↳ next` when the primary state doc has none |
+| CI state | latest GitHub Actions run for the current branch via `gh run list` — only probed when the repo has a `.github/workflows/*.yml` file AND a github.com remote; cached 1h in `$BRIEF_HOME/ci.json`, keyed by the upstream sha; `--refresh-ci` forces a re-probe, `--no-ci` (or env `BRIEF_NO_CI=1`) skips it entirely; `gh` missing/unauthenticated never throws — one trailing `ci: gh unavailable — install/auth gh or pass --no-ci` line instead |
 | tokens (7d) | `tally --json --since 7d`, when `tally` is on PATH — shown, not scored |
 
 Score = dirty (≤20) + unpushed (5+n) + behind (2) + **stale-dirty Nd** (+8: dirty and no
@@ -99,7 +102,8 @@ result for the repo has a red gate, from `~/.snuff/<slug>.json` or `<repo>/.snuf
 cached, no subprocess in the radar) + **gates stale** (+2: last snuff run older than 3d) + **dead CLAUDE.md paths**
 (1 each, ≤5) + **runtime ✗** (+6) / **runtime ⚠** (+2, from pulse's last snapshot, when
 `.brief.yaml service:` is set) + **unpushed Nd** (+1: oldest unpushed commit older than
-3d — work sitting local a while). Score 0 = quiet. The number is a sort key, not a grade.
+3d — work sitting local a while) + **ci ✗** (+5: red GitHub Actions run on the current
+branch — same weight as unpushed's base). Score 0 = quiet. The number is a sort key, not a grade.
 
 ## Per-repo overrides — `.brief.yaml`
 

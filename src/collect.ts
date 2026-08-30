@@ -12,6 +12,7 @@ import { readConfig } from './config.js';
 import { readTally, attachTokens } from './tokens.js';
 import { readSnuffLast } from './gates.js';
 import { readPulseLast, runtimeFor } from './runtime.js';
+import { ciState } from './ci.js';
 import type { Repo, Report } from './types.js';
 
 type GateResult = { name: string; ok: boolean; skipped: string | null };
@@ -41,6 +42,8 @@ export interface CollectOpts {
   only?: string; // substring filter on name
   concurrency?: number;
   staleDays?: number;
+  refreshCi?: boolean;
+  noCi?: boolean;
 }
 
 export async function collectOne(
@@ -49,7 +52,7 @@ export async function collectOne(
   now: number,
   sessionsIdx = indexSessions(now),
   staleDays = 7,
-  opts: { gates?: GateRunner; lastSaid?: boolean } = {},
+  opts: { gates?: GateRunner; lastSaid?: boolean; refreshCi?: boolean; noCi?: boolean } = {},
 ): Promise<Repo | null> {
   const cfg = readConfig(path);
   if (cfg.ignore) return null;
@@ -89,6 +92,7 @@ export async function collectOne(
     const pulse = readPulseLast();
     if (pulse) repo.runtime = runtimeFor(cfg.service, pulse.findings);
   }
+  repo.ci = await ciState(path, { now, refresh: opts.refreshCi, noCi: opts.noCi });
   if (opts.lastSaid) {
     const transcript = newestTranscript(path);
     const tail = transcript && lastAssistantTail(transcript.file);
@@ -117,7 +121,7 @@ export async function collect(opts: CollectOpts): Promise<Report> {
     Array.from({ length: Math.min(limit, cands.length) }, async () => {
       while (i < cands.length) {
         const k = i++;
-        repos[k] = await collectOne(cands[k].name, cands[k].path, opts.now, idx, opts.staleDays);
+        repos[k] = await collectOne(cands[k].name, cands[k].path, opts.now, idx, opts.staleDays, { refreshCi: opts.refreshCi, noCi: opts.noCi });
       }
     }),
   );

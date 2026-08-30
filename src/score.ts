@@ -2,6 +2,9 @@ import type { Repo } from './types.js';
 
 const DAY = 86_400_000;
 const DORMANT_DAYS = 180;
+// Same flat weight `unpushed` adds before its per-commit bonus — a red CI run and
+// unpushed work are both "something needs a push" signals.
+export const CI_FAIL_WEIGHT = 5;
 
 /** Attention score: what needs a decision or a push, not raw activity.
  *  Tags are the explanation and render next to the number. */
@@ -89,6 +92,10 @@ export function score(r: Repo, now: number, staleDays = 7): { score: number; rea
       s += 2;
       why.push(`gates stale ${Math.round(age / DAY)}d`);
     }
+  }
+  if (r.ci?.state === 'fail') {
+    s += CI_FAIL_WEIGHT;
+    why.push('ci ✗');
   }
   return { score: s, reasons: why };
 }

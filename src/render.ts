@@ -27,9 +27,14 @@ export function renderText(rep: Report, opts: { top: number; all: boolean; brief
   const unpushed = repos.filter((r) => r.git?.ahead).length;
   const untriaged = repos.filter((r) => r.feedback?.untriaged.length).length;
   const active = repos.filter((r) => r.sessions.count7d > 0).length;
+  const redCi = repos.filter((r) => r.ci?.state === 'fail').length;
+  // `state:'unknown'` with no `sha` means ci.ts's gh call itself failed (missing/unauth/
+  // network/bad JSON) rather than a legitimate in-progress run — see ci.ts's `ciState`.
+  const ghUnavailable = repos.some((r) => r.ci?.state === 'unknown' && r.ci.sha === undefined);
+  const ciLine = ghUnavailable ? 'ci: gh unavailable — install/auth gh or pass --no-ci' : null;
   const out: string[] = [];
   out.push(
-    `brief — ${repos.length} repos · ${dirty} dirty · ${unpushed} unpushed · ${untriaged} with untriaged FEEDBACK · ${active} active (7d)`,
+    `brief — ${repos.length} repos · ${dirty} dirty · ${unpushed} unpushed · ${untriaged} with untriaged FEEDBACK · ${active} active (7d)${redCi > 0 ? ` · ${redCi} red CI` : ''}`,
   );
   const shown = opts.all ? repos : repos.filter((r) => !isQuiet(r)).slice(0, opts.top);
   const w = Math.min(22, Math.max(6, ...shown.map((r) => r.name.length)));
@@ -46,6 +51,8 @@ export function renderText(rep: Report, opts: { top: number; all: boolean; brief
     if (r.tokens7d !== undefined) bits.push(`${fmtTokens(r.tokens7d)} tok/7d`);
     const plan = r.docs.find((d) => d.file.toLowerCase() === 'plan.md');
     if (plan && plan.open + plan.done > 0) bits.push(`PLAN ${plan.done}/${plan.open + plan.done}`);
+    const ci = r.ci;
+    if (ci?.state === 'fail') bits.push(`ci ✗ ${ci.workflow ?? '?'} @${ci.sha ? ci.sha.slice(0, 7) : '???????'}`);
     out.push(`${r.name.padEnd(w)} ${String(r.score).padStart(3)}  ${r.reasons.join(' · ') || 'quiet'}`);
     out.push(`${''.padEnd(w)}      ${bits.join(' · ')}`);
     const next = primary?.next[0];
@@ -56,7 +63,7 @@ export function renderText(rep: Report, opts: { top: number; all: boolean; brief
     const more = rest.length ? `… +${rest.length} more, run brief` : null;
     const cap = more ? 14 : 15;
     const kept = out.length > cap ? out.slice(0, cap) : out;
-    return [...kept, ...(more ? [more] : [])].join('\n');
+    return [...kept, ...(more ? [more] : []), ...(ciLine ? [ciLine] : [])].join('\n');
   }
   if (!opts.all) {
     const rest = repos.filter((r) => !shown.includes(r));
@@ -68,6 +75,7 @@ export function renderText(rep: Report, opts: { top: number; all: boolean; brief
     }
     if (quiet.length) out.push(`quiet: ${quiet.length}${quiet.length <= 12 ? ` — ${quiet.map((r) => r.name).join(', ')}` : ' (--all to list)'}`);
   }
+  if (ciLine) out.push(ciLine);
   return out.join('\n');
 }
 

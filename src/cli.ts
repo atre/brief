@@ -19,6 +19,8 @@ export interface Args {
   next: boolean;
   visibility?: 'public' | 'private';
   refreshVisibility: boolean;
+  refreshCi: boolean;
+  noCi: boolean;
 }
 
 export const HELP = `brief — cross-repo state radar
@@ -49,12 +51,15 @@ flags
   --tokens <n>       trim the handoff to roughly n tokens (default 1200)
   --stale <days>     stale-dirty threshold: dirty and no session in <days> (default 7)
   --gates            "brief <repo>" only: run snuff --json --changed and show a gates: line
+  --refresh-ci       re-probe GitHub Actions state instead of using the cached (≤1h) result
+  --no-ci            skip CI probing entirely (same as env BRIEF_NO_CI=1)
   -h, --help · -v, --version
 
 score = dirty files (≤20, or +2 flat if dormant) + unpushed (5+n) + behind (+2)
       + stale-dirty (+8, dirty and no session in --stale days; skipped if dormant)
       + dormant tag (no commit AND no session in 180d — caps dirty instead of stacking with stale-dirty)
       + primary doc stale (5c:+4, 20c:+8) + untriaged FEEDBACK sections (3 each, ≤12)
+      + ci ✗ (+5, red GitHub Actions run on the current branch — same weight as unpushed's base)
 per-repo overrides: .brief.yaml — stateDoc, nextHeading, description, ignore
 `;
 
@@ -75,6 +80,8 @@ export function parseArgs(argv: string[], home: string): Args {
     lessons: false,
     next: false,
     refreshVisibility: false,
+    refreshCi: false,
+    noCi: false,
   };
   let topGiven = false;
   const positional: string[] = [];
@@ -103,6 +110,8 @@ export function parseArgs(argv: string[], home: string): Args {
       if (a.visibility && a.visibility !== 'private') throw new Error('use one of --public / --private');
       a.visibility = 'private';
     } else if (x === '--refresh-visibility') a.refreshVisibility = true;
+    else if (x === '--refresh-ci') a.refreshCi = true;
+    else if (x === '--no-ci') a.noCi = true;
     else if (x === '--next') a.next = true;
     else if (x === '--all') a.all = true;
     else if (x === '--only') a.only = next();
