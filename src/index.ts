@@ -104,7 +104,7 @@ async function main(): Promise<void> {
       return void console.log(
         JSON.stringify(view.repos.filter((r) => r.feedback?.items.length).map((r) => ({ name: r.name, path: r.path, visibility: r.visibility, items: r.feedback!.items })), null, 2),
       );
-    return void console.log(renderFeedback(view));
+    return void console.log(renderFeedback(view, { headers: args.headers }));
   }
   if (args.cmd === 'hub') {
     const file = args.hubFile ?? `${home}/git/hub/CLAUDE.md`;

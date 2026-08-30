@@ -49,7 +49,7 @@ test('ci: repo without workflows -> none, exec never called', async () => {
     return '[]';
   };
   const r = await ciState(dir, { home, now: NOW, exec });
-  assert.deepEqual(r, { state: 'none', checkedAt: NOW });
+  assert.deepEqual(r, { state: 'none', reason: 'no-workflow', checkedAt: NOW });
   assert.equal(calls, 0);
 });
 
@@ -81,7 +81,7 @@ test('ci: successful run -> pass, cached under $BRIEF_HOME/ci.json', async () =>
   assert.deepEqual(r, { state: 'pass', sha, workflow: 'CI', checkedAt: NOW });
   const cache = JSON.parse(readFileSync(join(home, 'ci.json'), 'utf8'));
   assert.equal(cache[dir].state, 'pass');
-  assert.equal(cache[dir].upstreamSha, sha);
+  assert.equal(cache[dir].keySha, sha);
 });
 
 test('ci: cached entry reused within TTL when upstream sha unchanged, re-probed once it changes', async () => {
@@ -127,7 +127,7 @@ test('ci: exec throwing -> unknown, never throws, and is not cached', async () =
     throw new Error('gh: not found');
   };
   const r = await ciState(dir, { home, now: NOW, exec });
-  assert.deepEqual(r, { state: 'unknown', checkedAt: NOW });
+  assert.deepEqual(r, { state: 'unknown', reason: 'no-gh', checkedAt: NOW });
   let entryAbsent = true;
   try {
     const cache = JSON.parse(readFileSync(join(home, 'ci.json'), 'utf8'));
@@ -148,13 +148,13 @@ test('ci: --no-ci opt / BRIEF_NO_CI env skip probing entirely, exec never called
     return '[]';
   };
   const viaOpt = await ciState(dir, { home, now: NOW, exec, noCi: true });
-  assert.deepEqual(viaOpt, { state: 'none', checkedAt: NOW });
+  assert.deepEqual(viaOpt, { state: 'none', reason: 'disabled', checkedAt: NOW });
   assert.equal(calls, 0);
 
   process.env.BRIEF_NO_CI = '1';
   try {
     const viaEnv = await ciState(dir, { home, now: NOW, exec });
-    assert.deepEqual(viaEnv, { state: 'none', checkedAt: NOW });
+    assert.deepEqual(viaEnv, { state: 'none', reason: 'disabled', checkedAt: NOW });
     assert.equal(calls, 0);
   } finally {
     delete process.env.BRIEF_NO_CI;
@@ -190,7 +190,7 @@ test('render: "gh unavailable" trailing line appears exactly once when a probed 
   const unknownRepo: Repo = {
     name: 'unk', path: '/unk', description: '', docs: [], feedback: null, git: null,
     sessions: { last: NOW, count7d: 1 }, snuff: true, deadPaths: [], score: 1, reasons: ['y'],
-    ci: { state: 'unknown', checkedAt: NOW },
+    ci: { state: 'unknown', reason: 'no-gh', checkedAt: NOW },
   };
   const text = renderText({ root: ['/r'], now: NOW, repos: [okRepo, unknownRepo] }, { top: 10, all: true });
   assert.match(text, /ci: gh unavailable — install\/auth gh or pass --no-ci/);

@@ -28,9 +28,7 @@ export function renderText(rep: Report, opts: { top: number; all: boolean; brief
   const untriaged = repos.filter((r) => r.feedback?.untriaged.length).length;
   const active = repos.filter((r) => r.sessions.count7d > 0).length;
   const redCi = repos.filter((r) => r.ci?.state === 'fail').length;
-  // `state:'unknown'` with no `sha` means ci.ts's gh call itself failed (missing/unauth/
-  // network/bad JSON) rather than a legitimate in-progress run — see ci.ts's `ciState`.
-  const ghUnavailable = repos.some((r) => r.ci?.state === 'unknown' && r.ci.sha === undefined);
+  const ghUnavailable = repos.some((r) => r.ci?.reason === 'no-gh');
   const ciLine = ghUnavailable ? 'ci: gh unavailable — install/auth gh or pass --no-ci' : null;
   const out: string[] = [];
   out.push(
@@ -202,13 +200,13 @@ export function renderLessonsMd(rep: Report): string {
   return out.join('\n');
 }
 
-export function renderFeedback(rep: Report): string {
+export function renderFeedback(rep: Report, opts: { headers?: boolean } = {}): string {
   const withFb = rep.repos.filter((r) => r.feedback?.items.length).sort((a, b) => b.feedback!.items.length - a.feedback!.items.length);
   const total = withFb.reduce((n, r) => n + r.feedback!.items.length, 0);
   const out = [`feedback — ${total} untriaged sections in ${withFb.length} repos (after each repo's last "## <date> — triage" marker)`];
   for (const r of withFb) {
-    out.push(`${r.name} (${r.feedback!.items.length})${r.visibility === 'public' || r.visibility === 'private' ? ` [${r.visibility}]` : ''} — ${r.path}/FEEDBACK.md`);
-    for (const it of r.feedback!.items) out.push(`  · ${it.header}${it.preview ? `\n      ${it.preview}` : ''}`);
+    out.push(`${r.name} (${r.feedback!.items.length})${r.visibility && r.visibility !== 'unknown' ? ` [${r.visibility}]` : ''} — ${r.path}/FEEDBACK.md`);
+    for (const it of r.feedback!.items) out.push(`  · ${it.header}${!opts.headers && it.preview ? `\n      ${it.preview}` : ''}`);
   }
   if (!withFb.length) out.push('nothing untriaged — every dated section sits above a triage marker');
   return out.join('\n');

@@ -33,6 +33,7 @@ brief --refresh-ci        # re-probe CI state instead of using the cached (≤1h
 brief --hub               # diff discovered repos vs ~/git/hub/CLAUDE.md table
 brief --hub --write       # append missing repos as rows above the "No index yet" row (curated rows untouched)
 brief feedback            # every untriaged FEEDBACK.md section across repos, one preview line each (a FEEDBACK.md with no "## <date>" sections is ignored, not an error)
+brief feedback --headers  # repo lines + section headers only, no preview lines — the cheap first call of a sweep (then --only <sub> for one repo with previews)
 brief feedback --lessons  # "- lesson: …" bullets across all repos, any section · --md for a table for LESSONS.md
 brief queue               # repos whose PLAN/state doc is agent-runnable: <repo> PLAN d/n ↳ next item · --json
 brief snap [name]         # write a workspace snapshot to ~/.brief/snaps/<name>.json (default "last")
@@ -85,14 +86,14 @@ recent commits:
 | description | first real paragraph of README.md, else CLAUDE.md (agent boilerplate skipped) |
 | primary state doc + "next" | first of `STATE.md · STATUS.md · TODO.md · PLAN.md`: bullets under a `## Next`/`resume`/`now`/`todo` heading, else open `- [ ]` items, else CLAUDE.md checkboxes |
 | doc drift | commits on HEAD after the commit that last touched the state doc (`Nc stale`) |
-| untriaged feedback | `FEEDBACK.md` `## <date>` sections after the last `## <date> — triage` marker (all dated sections when there is no marker; a header-only file is ignored) |
+| untriaged feedback | `FEEDBACK.md` `## <date>` sections after the last `## <date> — triage` marker (all dated sections when there is no marker; a header-only file is ignored); `brief feedback` tags each repo `[public]` / `[private]` / `[local]` (not git or no GitHub remote — excluded by `--public`/`--private`; a failed gh lookup shows no tag); `--headers` drops the preview lines |
 | sessions | Claude Code transcripts (`~/.claude/projects`, `~/.claude-dev/projects`; env `BRIEF_PROJECTS`) — count in 7d, last |
 | snuff | `snuff.yaml` present |
 | dead CLAUDE.md paths | backticked paths in CLAUDE.md that no longer resolve, capped at 5 — relative paths tried at the root, then anywhere in the tree (depth ≤ 4); `~/`, `/Users/` paths checked as-is; CIDRs, regexes, URL paths, flag pairs, `Next.js`-style names, runtime `*.json` never count |
 | gates | snuff's last result: `~/.snuff/<slug>.json`, else the in-repo `<repo>/.snuff/last.json` snuff writes today (ISO `ts`, `gates[].gate.name` — both shapes accepted); `--gates` runs snuff live for one repo |
 | runtime | pulse's last snapshot (`~/.pulse/snaps/last.json`) joined on `.brief.yaml service:` — ids `k8s:<ns>/<name>`, `cron:<ns>/<name>`, `site:<url>` matched exactly; `pvc:`/`node:`/`host:`/`disk:` findings are not repo-attributable and never join |
 | PLAN progress | `PLAN d/total` from PLAN.md checkboxes; its first open item backs `↳ next` when the primary state doc has none |
-| CI state | latest GitHub Actions run for the current branch via `gh run list` — only probed when the repo has a `.github/workflows/*.yml` file AND a github.com remote; cached 1h in `$BRIEF_HOME/ci.json`, keyed by the upstream sha; `--refresh-ci` forces a re-probe, `--no-ci` (or env `BRIEF_NO_CI=1`) skips it entirely; `gh` missing/unauthenticated never throws — one trailing `ci: gh unavailable — install/auth gh or pass --no-ci` line instead |
+| CI state | latest GitHub Actions run for the current branch via `gh run list` — only probed when the repo has a `.github/workflows/*.yml` file AND a github.com remote; cached 1h in `$BRIEF_HOME/ci.json`, keyed by the upstream sha (HEAD when the branch has no upstream); `--refresh-ci` forces a re-probe, `--no-ci` (or env `BRIEF_NO_CI=1`) skips it entirely; `gh` missing/unauthenticated never throws — one trailing `ci: gh unavailable — install/auth gh or pass --no-ci` line instead; `--json` carries `ci.reason` (`disabled` / `no-workflow` / `no-remote` / `no-runs` / `in-progress` / `unrecognized` / `no-gh`) on every non-pass/fail result |
 | tokens (7d) | `tally --json --since 7d`, when `tally` is on PATH — shown, not scored |
 
 Score = dirty (≤20) + unpushed (5+n) + behind (2) + **stale-dirty Nd** (+8: dirty and no
