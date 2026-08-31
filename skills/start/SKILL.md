@@ -1,6 +1,6 @@
 ---
 name: start
-description: Session kickoff for any repo — one screen from the tool fleet (brief handoff, pulse runtime, snuff gates, tally trace) before the first edit. TRIGGER on "start", "catch me up", "where was I in <repo>", "let's continue in <repo>", or when a session opens in a repo with no STATE.md. SKIP inside hub (its SessionStart hook already prints the radars).
+description: Session kickoff for any repo — one screen from the tool fleet (brief handoff, pulse runtime, snuff gates, tally trace) before the first edit. TRIGGER on "start", "catch me up", "where was I in <repo>", "let's continue in <repo>", or when a session opens in a repo with no STATE.md. SKIP inside hub (its SessionStart hook already prints pulse + brief).
 ---
 
 # /start [repo]

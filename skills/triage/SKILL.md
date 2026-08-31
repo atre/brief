@@ -7,7 +7,10 @@ description: Triage the fleet's FEEDBACK.md files — turn untriaged sections in
 
 ```sh
 brief feedback                 # every untriaged FEEDBACK section, one preview line each (all repos, or --only <tool>)
+tally pending                  # fleet-tool uses that never got a FEEDBACK entry (the queue that replaced the Stop-hook nag)
 ```
+
+`tally pending` rows are *unwritten* feedback: for each, decide from the command alone whether the use was uneventful (most are — say nothing, they age out) or worth a line in that tool's FEEDBACK.md. Never write "it worked" entries just to clear the queue.
 
 For each listed section (open the FEEDBACK.md at the exact `## <date> …` header — read that section only):
 1. Classify every bullet:
