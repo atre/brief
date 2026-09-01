@@ -1,0 +1,94 @@
+# Identifier hygiene for public repos — hub TOOLS.md § Redaction & PII (2026-09-01).
+#
+# gitleaks finds SECRETS. These rules cover the class it does not: personal
+# identifiers — a real username in a path, a personal email, a real host address.
+# That class is what actually leaked on 2026-08-19 and 2026-08-28.
+#
+# Scans identifier POSITIONS, never a list of private names: the private names are
+# ordinary English (`helper`, `scrap`, `trader`, `art`, `docs`) and a denylist over
+# them measured 13 hits / 0 true positives. Allowlists below therefore enumerate
+# what we DO publish (visible when the gate fires) rather than what we must hide.
+
+[extend]
+useDefault = true # never replace the secret rules — this file only ADDS to them
+
+[[rules]]
+id = "identity-home-path"
+description = "Absolute home path carrying a real username"
+regex = '''/(?:Users|home)/[a-zA-Z][a-zA-Z0-9_.-]{1,31}/'''
+tags = ["identity"]
+
+  [[rules.allowlists]]
+  regexTarget = "match"
+  regexes = [
+    # documentation placeholders in use across the fleet
+    '''/(?:Users|home)/(?:x|v|z|u|you|user|username|USER|me|test|tester|example|runner|node|root|app|ubuntu|admin|dev|ci|nobody|somebody|anyone)/''',
+    # templated / variable forms: /Users/<you>/, /Users/${USER}/, /Users/$USER/
+    '''/(?:Users|home)/(?:<[^>]+>|\{\{[^}]+\}\}|\$\{?[A-Za-z_][A-Za-z0-9_]*\}?)/''',
+  ]
+
+[[rules]]
+id = "identity-email"
+description = "Email address outside the documentation domains"
+regex = '''[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,24}'''
+tags = ["identity"]
+
+  [[rules.allowlists]]
+  regexTarget = "match"
+  regexes = [
+    # RFC 2606 / 6761 reserved: example.com, *.example, .test, .invalid, .localhost
+    '''(?i)@(?:[a-zA-Z0-9-]+\.)*(?:example|test|invalid|localhost)(?:\.[a-zA-Z]{2,24})?$''',
+    # single-letter and generic fixture domains already in the test corpora
+    '''@(?:[a-d]|x\.y|shop|other|foo|bar|acme|domain|site|mail|noreply)\.[a-zA-Z]{2,24}$''',
+    # package metadata / license boilerplate addresses
+    '''@(?:users\.noreply\.github\.com|npmjs\.com|nodejs\.org)$''',
+    # SCP-style git remotes: `git@github.com:owner/repo` is a URL, not an address
+    '''^git@(?:github|gitlab|bitbucket|codeberg)\.(?:com|org)$''',
+    # one/two-letter fixture domains and their subdomains (a@b.com, dmarc@ops.b.com)
+    '''@(?:[a-z0-9-]+\.)*[a-z]{1,2}\.(?:com|org|net)$''',
+    # vendor domains that only appear inside DMARC/SPF fixtures
+    '''@(?:[a-z0-9-]+\.)*postmarkapp\.com$''',
+    # anonymised DSN/token fixtures: a 32-hex local part is never a real mailbox
+    '''^[0-9a-f]{32}@''',
+  ]
+
+[[rules]]
+id = "identity-public-ip"
+description = "Public IPv4 outside the TEST-NET documentation ranges"
+regex = '''\b(?:(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\b'''
+tags = ["identity"]
+
+  [[rules.allowlists]]
+  regexTarget = "match"
+  regexes = [
+    # RFC 5737 documentation ranges — the fleet's mandated stand-ins
+    '''^(?:192\.0\.2|198\.51\.100|203\.0\.113)\.''',
+    # RFC 1918 private + loopback + link-local + CGNAT: not identifying
+    '''^(?:10\.|127\.|169\.254\.|192\.168\.|100\.(?:6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.)''',
+    '''^172\.(?:1[6-9]|2[0-9]|3[01])\.''',
+    # unspecified, broadcast, multicast/reserved
+    '''^0\.''',
+    '''^255\.255\.255\.255$''',
+    '''^(?:22[4-9]|23[0-9]|24[0-9]|25[0-5])\.''',
+    # well-known public resolvers + canonical doc addresses used as fixtures
+    '''^(?:1\.1\.1\.1|1\.0\.0\.1|8\.8\.8\.8|8\.8\.4\.4|9\.9\.9\.9|149\.112\.112\.112)$''',
+    '''^(?:1\.2\.3\.4|122\.0\.0\.0)$''',
+    # IANA special-purpose: protocol assignments, benchmarking, 6to4 relay anycast
+    '''^(?:192\.0\.0\.|198\.1[89]\.|192\.88\.99\.)''',
+  ]
+
+  # peep's SSRF guard suite asserts on real public addresses on purpose — the
+  # boundary cases (172.15/172.32 just outside RFC1918, a Cloudflare address)
+  # ARE the test. Scoped to that one file, so a stray address anywhere else fires.
+  [[rules.allowlists]]
+  paths = ['''(^|/)test/fetch-guard\.test\.ts$''']
+
+# `gitleaks git .` walks every ref, including the pre-public archives the fleet
+# deliberately retains locally (refs/archive/pre-public-*, never pushed). Those
+# commits are pre-scrub by definition and immutable, so they would keep this gate
+# red forever. Allowlisted by exact SHA — narrow and auditable. The durable fix is
+# to scope the gate to publishable history (`gitleaks git . --log-opts=HEAD`);
+# do that when snuff init's `secrets` template is next touched.
+[[allowlists]]
+description = "pre-public archive commits — retained locally, never pushed"
+commits = ["bdb5a6b29545f8cb83a2ad2972cb273fa92c193f"]
