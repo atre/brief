@@ -62,8 +62,23 @@ export interface Repo {
   reasons: string[]; // why it scored, short tags
 }
 
+export type Severity = 'crit' | 'warn' | 'ok';
+
+/** The fleet finding shape — pulse `src/types.ts` is the reference; ids are `repo:<name>`.
+ *  Derived from `repos[]` in `findings.ts`, never authored separately. */
+export interface Finding {
+  id: string;
+  scope: 'repo';
+  severity: Severity;
+  title: string;
+  detail?: string;
+  hint?: string;
+}
+
 export interface Report {
   root: string[];
   now: number;
+  /** contract shape for generic consumers (hub-tui, /ship); derived from `repos` */
+  findings: Finding[];
   repos: Repo[];
 }

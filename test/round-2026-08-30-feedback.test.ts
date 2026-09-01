@@ -24,6 +24,7 @@ test('feedback: [local] tag for repos with no GitHub remote / not git; unknown a
   const rep: Report = {
     root: ['/r'],
     now: NOW,
+    findings: [],
     repos: [
       fbk('/r/x', 'public', [item('2026-08-20 — a')]),
       fbk('/r/y', 'private', [item('2026-08-20 — b')]),
@@ -57,6 +58,7 @@ test('feedback --headers: repo lines + section headers only, no preview lines; d
   const rep: Report = {
     root: ['/r'],
     now: NOW,
+    findings: [],
     repos: [
       fbk('/r/y', 'private', [item('2026-08-20 — c', 'preview c')]),
       fbk('/r/x', 'public', [item('2026-08-20 — a', 'preview a'), item('2026-08-21 — b', 'preview b')]),

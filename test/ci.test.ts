@@ -175,7 +175,7 @@ test('score + render: red CI adds CI_FAIL_WEIGHT (same as unpushed base) and ren
   assert.ok(!sPass.reasons.includes('ci ✗'));
 
   const repo: Repo = { ...fail, score: sFail.score, reasons: sFail.reasons };
-  const text = renderText({ root: ['/r'], now: NOW, repos: [repo] }, { top: 10, all: true });
+  const text = renderText({ root: ['/r'], now: NOW, findings: [], repos: [repo] }, { top: 10, all: true });
   assert.match(text, /ci ✗/);
   assert.match(text, /ci ✗ CI @abcdef1/);
   assert.match(text, /1 red CI/);
@@ -192,9 +192,9 @@ test('render: "gh unavailable" trailing line appears exactly once when a probed 
     sessions: { last: NOW, count7d: 1 }, snuff: true, deadPaths: [], score: 1, reasons: ['y'],
     ci: { state: 'unknown', reason: 'no-gh', checkedAt: NOW },
   };
-  const text = renderText({ root: ['/r'], now: NOW, repos: [okRepo, unknownRepo] }, { top: 10, all: true });
+  const text = renderText({ root: ['/r'], now: NOW, findings: [], repos: [okRepo, unknownRepo] }, { top: 10, all: true });
   assert.match(text, /ci: gh unavailable — install\/auth gh or pass --no-ci/);
   assert.equal(text.match(/gh unavailable/g)?.length, 1);
-  const clean = renderText({ root: ['/r'], now: NOW, repos: [okRepo] }, { top: 10, all: true });
+  const clean = renderText({ root: ['/r'], now: NOW, findings: [], repos: [okRepo] }, { top: 10, all: true });
   assert.doesNotMatch(clean, /gh unavailable/);
 });

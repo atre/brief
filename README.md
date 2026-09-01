@@ -106,6 +106,27 @@ cached, no subprocess in the radar) + **gates stale** (+2: last snuff run older 
 3d — work sitting local a while) + **ci ✗** (+5: red GitHub Actions run on the current
 branch — same weight as unpushed's base). Score 0 = quiet. The number is a sort key, not a grade.
 
+### `--json` shape
+
+`{root, now, findings[], repos[]}`. `repos[]` is everything brief knows per repo,
+including `score` and `reasons`.
+
+`findings[]` is the fleet finding schema (`{id, scope, severity, title, detail?,
+hint}`), so a generic reader joins brief with pulse/snuff/peep/looksy/tally
+without knowing what a repo is:
+
+```json
+{"id":"repo:acme","scope":"repo","severity":"crit",
+ "title":"acme — 12 dirty · 2 unpushed · gates ✗ test",
+ "detail":"attention score 25","hint":"brief acme"}
+```
+
+Derived from `score`/`reasons`, never re-scored — a consumer and the text table
+rank the fleet identically. Score-0 repos emit nothing (the same rule that hides
+them from the table). `crit` means another tool already reported red — red snuff
+gates, a failed CI run, or `runtime ✗` from pulse; everything else scoring above
+zero is `warn`, i.e. unattended rather than broken.
+
 ## Per-repo overrides — `.brief.yaml`
 
 Zero-config by default; for repos with their own conventions:

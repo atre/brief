@@ -8,6 +8,7 @@ import { gitInfo } from './git.js';
 import { describe, docInfos, fatDocs, feedbackInfo, extractNext, readIf, deadPaths } from './docs.js';
 import { indexSessions, sessionsFor, newestTranscript, lastAssistantTail } from './sessions.js';
 import { score } from './score.js';
+import { toFindings } from './findings.js';
 import { readConfig } from './config.js';
 import { readTally, attachTokens } from './tokens.js';
 import { readSnuffLast } from './gates.js';
@@ -127,5 +128,5 @@ export async function collect(opts: CollectOpts): Promise<Report> {
   );
   const live = repos.filter((r): r is Repo => r !== null);
   attachTokens(live, await readTally(), homedir());
-  return { root: opts.roots, now: opts.now, repos: live };
+  return { root: opts.roots, now: opts.now, findings: toFindings(live), repos: live };
 }

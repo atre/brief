@@ -230,7 +230,7 @@ test('discover: --docs-root scans non-git dirs with a state doc', async () => {
   const repo = (await collectOne('Notes', cands[0].path, NOW, new Map()))!;
   assert.equal(repo.git, null);
   assert.equal(repo.docs[0].file, 'STATUS.md');
-  const line = renderText({ root: [], now: NOW, repos: [repo] }, { top: 10, all: true });
+  const line = renderText({ root: [], now: NOW, findings: [], repos: [repo] }, { top: 10, all: true });
   assert.doesNotMatch(line, /commit/);
 });
 
@@ -240,7 +240,7 @@ test('render helpers', () => {
   assert.equal(ago(NOW - 40 * 86_400_000, NOW), '1mo');
   assert.equal(ago(0, NOW), '—');
   assert.deepEqual(groupFiles(['a/1', 'a/2', 'b/1', 'c'], 2), ['a/ ×2', 'b/']);
-  const rep = { root: ['/r'], now: NOW, repos: [] as Repo[] };
+  const rep = { root: ['/r'], now: NOW, findings: [], repos: [] as Repo[] };
   assert.match(renderText(rep, { top: 10, all: false }), /^brief — 0 repos/);
 });
 
@@ -286,7 +286,7 @@ test('feedback: --lessons finds "- lesson:" bullets in any section, triaged or n
     { ts: Date.parse('2026-08-01'), text: 'mocking the db hid a migration bug' },
     { ts: Date.parse('2026-08-15'), text: 'terse responses only' },
   ]);
-  const rep = { root: ['/r'], now: NOW, repos: [{ name: 'x', feedback: fi } as unknown as Repo] };
+  const rep = { root: ['/r'], now: NOW, findings: [], repos: [{ name: 'x', feedback: fi } as unknown as Repo] };
   const text = renderLessons(rep);
   assert.match(text, /mocking the db hid a migration bug/);
   assert.match(text, /terse responses only/);
@@ -411,13 +411,13 @@ test('render: --brief hook mode is 2 lines/repo, no fold/quiet lines, capped at 
     name: `r${i}`, path: `/r${i}`, description: '', docs: [], feedback: null, git: null,
     sessions: { last: NOW, count7d: 1 }, snuff: true, deadPaths: [], score: 20 - i, reasons: [`${20 - i} dirty`],
   }));
-  const out = renderText({ root: [], now: NOW, repos }, { top: 3, all: false, brief: true });
+  const out = renderText({ root: [], now: NOW, findings: [], repos }, { top: 3, all: false, brief: true });
   const lines = out.split('\n');
   assert.ok(lines.length <= 15);
   assert.ok(!lines.some((l) => l.startsWith('below the fold') || l.startsWith('quiet:')));
   assert.equal(lines.at(-1), '… +17 more, run brief');
   // --top 10 would need 21 lines: the cap trims repo lines, never the "+N more" tail
-  const wide = renderText({ root: [], now: NOW, repos }, { top: 10, all: false, brief: true }).split('\n');
+  const wide = renderText({ root: [], now: NOW, findings: [], repos }, { top: 10, all: false, brief: true }).split('\n');
   assert.equal(wide.length, 15);
   assert.equal(wide.at(-1), '… +10 more, run brief');
 });
@@ -488,7 +488,7 @@ test('PLAN progress: "PLAN d/total" tag on the radar, first open item as ↳ nex
   });
   const repo = (await collectOne('r', dir, NOW, new Map()))!;
   assert.equal(repo.docs[0].next[0], 'c first');
-  const line = renderText({ root: [], now: NOW, repos: [repo] }, { top: 10, all: true });
+  const line = renderText({ root: [], now: NOW, findings: [], repos: [repo] }, { top: 10, all: true });
   assert.match(line, /PLAN 2\/5/);
 });
 
@@ -567,7 +567,7 @@ test('git: unpushedSince from the oldest unpushed commit; score/radar show the a
   };
   const s = score(repo, NOW);
   assert.ok(s.reasons.includes('unpushed 4d'));
-  const line = renderText({ root: [], now: NOW, repos: [{ ...repo, score: s.score, reasons: s.reasons }] }, { top: 10, all: true });
+  const line = renderText({ root: [], now: NOW, findings: [], repos: [{ ...repo, score: s.score, reasons: s.reasons }] }, { top: 10, all: true });
   assert.match(line, /1 unpushed \(4d\)/);
 });
 

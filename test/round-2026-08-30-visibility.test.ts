@@ -77,7 +77,7 @@ test('feedback: repo line carries a [public]/[private]/[local] tag; unknown carr
   const item = { header: '2026-08-20 — a', ts: Date.parse('2026-08-20'), preview: 'p' };
   const fbk = (path: string, visibility: string): Repo =>
     ({ name: path.slice(3), path, visibility, feedback: { sections: 1, untriaged: [item.header], items: [item], lessons: [] } } as unknown as Repo);
-  const out = renderFeedback({ root: ['/r'], now: NOW, repos: [fbk('/r/x', 'public'), fbk('/r/y', 'private'), fbk('/r/z', 'local')] });
+  const out = renderFeedback({ root: ['/r'], now: NOW, findings: [], repos: [fbk('/r/x', 'public'), fbk('/r/y', 'private'), fbk('/r/z', 'local')] });
   assert.match(out, /^x \(1\) \[public\] — \/r\/x\/FEEDBACK\.md$/m);
   assert.match(out, /^y \(1\) \[private\] — \/r\/y\/FEEDBACK\.md$/m);
   assert.match(out, /^z \(1\) \[local\] — \/r\/z\/FEEDBACK\.md$/m);

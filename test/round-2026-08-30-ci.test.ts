@@ -146,10 +146,10 @@ test('render: the "gh unavailable" line keys on reason === no-gh, not on a missi
   const inProgressNoSha: Repo = { ...base, ci: { state: 'unknown', reason: 'in-progress', checkedAt: NOW } };
   const noGh: Repo = { ...base, name: 'z', path: '/z', ci: { state: 'unknown', reason: 'no-gh', checkedAt: NOW } };
 
-  const quiet = renderText({ root: ['/r'], now: NOW, repos: [inProgressNoSha] }, { top: 10, all: true });
+  const quiet = renderText({ root: ['/r'], now: NOW, findings: [], repos: [inProgressNoSha] }, { top: 10, all: true });
   assert.doesNotMatch(quiet, /gh unavailable/);
 
-  const loud = renderText({ root: ['/r'], now: NOW, repos: [inProgressNoSha, noGh] }, { top: 10, all: true });
+  const loud = renderText({ root: ['/r'], now: NOW, findings: [], repos: [inProgressNoSha, noGh] }, { top: 10, all: true });
   assert.match(loud, /ci: gh unavailable — install\/auth gh or pass --no-ci/);
   assert.equal(loud.match(/gh unavailable/g)?.length, 1);
 });

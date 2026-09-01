@@ -69,7 +69,7 @@ test('feedback: only a "<date> — triage" header is a marker; every dated secti
 });
 
 test('feedback: header and empty line name the triage-marker rule, not PLAN.md mtime', () => {
-  const rep: Report = { root: ['/x'], now: NOW, repos: [] };
+  const rep: Report = { root: ['/x'], now: NOW, findings: [], repos: [] };
   const out = renderFeedback(rep);
   assert.equal(out.split('\n')[0], 'feedback — 0 untriaged sections in 0 repos (after each repo\'s last "## <date> — triage" marker)');
   assert.match(out, /^nothing untriaged — every dated section sits above a triage marker$/m);
