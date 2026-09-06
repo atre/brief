@@ -5,7 +5,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { discover } from './discover.js';
 import { gitInfo } from './git.js';
-import { describe, docInfos, fatDocs, feedbackInfo, extractNext, readIf, deadPaths } from './docs.js';
+import { describe, docInfos, fatDocs, feedbackInfo, extractNext, readIf, deadPaths, plansFor } from './docs.js';
 import { indexSessions, sessionsFor, newestTranscript, lastAssistantTail } from './sessions.js';
 import { score } from './score.js';
 import { toFindings } from './findings.js';
@@ -75,12 +75,14 @@ export async function collectOne(
     }
   }
   const planMtime = docs.find((d) => d.file.toLowerCase() === 'plan.md')?.mtime ?? docs[0]?.mtime ?? 0;
+  const plans = plansFor(path);
   const repo: Repo = {
     name,
     path,
     description: cfg.description ?? describe(path),
     git,
     docs,
+    ...(plans.length ? { plans } : {}),
     feedback: feedbackInfo(path, planMtime),
     sessions: sessionsFor(sessionsIdx, path),
     snuff: existsSync(join(path, 'snuff.yaml')),
@@ -112,6 +114,25 @@ export async function collectOne(
   return repo;
 }
 
+/** Byte-identical `description` (README first paragraph) across ≥2 repos means a fork
+ *  whose README was never rebranded — nudge, don't alarm: +1, once, both directions. */
+export function tagSharedDescriptions(repos: Repo[]): void {
+  const groups = new Map<string, Repo[]>();
+  for (const r of repos) {
+    if (!r.description) continue;
+    (groups.get(r.description) ?? groups.set(r.description, []).get(r.description)!).push(r);
+  }
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    const sorted = [...group].sort((a, b) => a.name.localeCompare(b.name));
+    for (const r of group) {
+      const others = sorted.filter((o) => o !== r);
+      r.reasons.push(`description shared with ${others[0].name}${others.length > 1 ? ` +${others.length - 1}` : ''}`);
+      r.score += 1;
+    }
+  }
+}
+
 export async function collect(opts: CollectOpts): Promise<Report> {
   const cands = discover(opts.roots, opts.exclude, opts.docsRoots).filter((c) => !opts.only || c.name.includes(opts.only));
   const idx = indexSessions(opts.now);
@@ -127,6 +148,7 @@ export async function collect(opts: CollectOpts): Promise<Report> {
     }),
   );
   const live = repos.filter((r): r is Repo => r !== null);
+  tagSharedDescriptions(live);
   attachTokens(live, await readTally(), homedir());
   return { root: opts.roots, now: opts.now, findings: toFindings(live), repos: live };
 }

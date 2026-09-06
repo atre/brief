@@ -33,6 +33,7 @@ brief --refresh-ci        # re-probe CI state instead of using the cached (≤1h
 brief --hub               # diff discovered repos vs ~/git/hub/CLAUDE.md table
 brief --hub --write       # append missing repos as rows above the "No index yet" row (curated rows untouched)
 brief feedback            # every untriaged FEEDBACK.md section across repos, one preview line each (a FEEDBACK.md with no "## <date>" sections is ignored, not an error)
+brief feedback --missing  # git repos under the roots with no FEEDBACK.md at all (the default view also gets a footer line when any exist)
 brief feedback --headers  # repo lines + section headers only, no preview lines — the cheap first call of a sweep (then --only <sub> for one repo with previews)
 brief feedback --lessons  # "- lesson: …" bullets across all repos, any section · --md for a table for LESSONS.md
 brief queue               # repos whose PLAN/state doc is agent-runnable: <repo> PLAN d/n ↳ next item · --json
@@ -69,6 +70,7 @@ git: feature-branch · 52 modified + 1 untracked · no upstream · last commit 1
 sessions: 22 in 7d · last 1min · snuff: no
 last session said: Stopped at step 3; lint still red (1min)
 docs: STATE.md 2min · PLAN.md 11h
+plans: 1 open (2026-08-30-motion-capture.md 3/8)
 next (STATE.md):
   - …
 dirty (53):
@@ -86,13 +88,14 @@ recent commits:
 | description | first real paragraph of README.md, else CLAUDE.md (agent boilerplate skipped) |
 | primary state doc + "next" | first of `STATE.md · STATUS.md · TODO.md · PLAN.md`: bullets under a `## Next`/`resume`/`now`/`todo` heading, else open `- [ ]` items, else CLAUDE.md checkboxes |
 | doc drift | commits on HEAD after the commit that last touched the state doc (`Nc stale`) |
-| untriaged feedback | `FEEDBACK.md` `## <date>` sections after the last `## <date> — triage` marker (all dated sections when there is no marker; a header-only file is ignored); `brief feedback` tags each repo `[public]` / `[private]` / `[local]` (not git or no GitHub remote — excluded by `--public`/`--private`; a failed gh lookup shows no tag); `--headers` drops the preview lines |
+| untriaged feedback | `FEEDBACK.md` `## <date>` sections after the last `## <date> — triage` marker (all dated sections when there is no marker; a header-only file is ignored); `brief feedback` tags each repo `[public]` / `[private]` / `[local]` (not git or no GitHub remote — excluded by `--public`/`--private`; a failed gh lookup shows no tag); `--headers` drops the preview lines; `--missing` lists git repos with no FEEDBACK.md at all (docs-only, non-git dirs never count) |
 | sessions | Claude Code transcripts (`~/.claude/projects`, `~/.claude-dev/projects`; env `BRIEF_PROJECTS`) — count in 7d, last |
 | snuff | `snuff.yaml` present |
 | dead CLAUDE.md paths | backticked paths in CLAUDE.md that no longer resolve, capped at 5 — relative paths tried at the root, then anywhere in the tree (depth ≤ 4); `~/`, `/Users/` paths checked as-is; CIDRs, regexes, URL paths, flag pairs, `Next.js`-style names, runtime `*.json` never count |
 | gates | snuff's last result: `~/.snuff/<slug>.json`, else the in-repo `<repo>/.snuff/last.json` snuff writes today (ISO `ts`, `gates[].gate.name` — both shapes accepted); `--gates` runs snuff live for one repo |
 | runtime | pulse's last snapshot (`~/.pulse/snaps/last.json`) joined on `.brief.yaml service:` — ids `k8s:<ns>/<name>`, `cron:<ns>/<name>`, `site:<url>` matched exactly; `pvc:`/`node:`/`host:`/`disk:` findings are not repo-attributable and never join |
 | PLAN progress | `PLAN d/total` from PLAN.md checkboxes; its first open item backs `↳ next` when the primary state doc has none |
+| plans/*.md progress | each `plans/<file>.md`'s `- [ ]`/`- [x]` step counts, handoff only: `plans: N open (file d/total, …) · M done` — finished gameplans are counted, not named; never scored (queued work, not neglected work) |
 | CI state | latest GitHub Actions run for the current branch via `gh run list` — only probed when the repo has a `.github/workflows/*.yml` file AND a github.com remote; cached 1h in `$BRIEF_HOME/ci.json`, keyed by the upstream sha (HEAD when the branch has no upstream); `--refresh-ci` forces a re-probe, `--no-ci` (or env `BRIEF_NO_CI=1`) skips it entirely; `gh` missing/unauthenticated never throws — one trailing `ci: gh unavailable — install/auth gh or pass --no-ci` line instead; `--json` carries `ci.reason` (`disabled` / `no-workflow` / `no-remote` / `no-runs` / `in-progress` / `unrecognized` / `no-gh`) on every non-pass/fail result |
 | tokens (7d) | `tally --json --since 7d`, when `tally` is on PATH — shown, not scored |
 
@@ -104,7 +107,9 @@ cached, no subprocess in the radar) + **gates stale** (+2: last snuff run older 
 (1 each, ≤5) + **runtime ✗** (+6) / **runtime ⚠** (+2, from pulse's last snapshot, when
 `.brief.yaml service:` is set) + **unpushed Nd** (+1: oldest unpushed commit older than
 3d — work sitting local a while) + **ci ✗** (+5: red GitHub Actions run on the current
-branch — same weight as unpushed's base). Score 0 = quiet. The number is a sort key, not a grade.
+branch — same weight as unpushed's base) + **description shared with `<other>`** (+1:
+byte-identical README first paragraph — a fork whose README was never rebranded).
+Score 0 = quiet. The number is a sort key, not a grade.
 
 ### `--json` shape
 
@@ -126,6 +131,8 @@ rank the fleet identically. Score-0 repos emit nothing (the same rule that hides
 them from the table). `crit` means another tool already reported red — red snuff
 gates, a failed CI run, or `runtime ✗` from pulse; everything else scoring above
 zero is `warn`, i.e. unattended rather than broken.
+
+`--json --section git,docs` (repeatable/comma-list, radar or `brief <repo>` only) trims each repo down to exactly the named `Repo` keys plus `name`; `findings[]` is dropped since a `--section` consumer wants the per-repo view, not derived rows.
 
 ## Per-repo overrides — `.brief.yaml`
 

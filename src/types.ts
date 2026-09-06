@@ -41,12 +41,19 @@ export interface SessionInfo {
   count7d: number;
 }
 
+export interface PlanInfo {
+  file: string; // plans/<file>.md
+  open: number; // "- [ ]" count
+  done: number; // "- [x]" count
+}
+
 export interface Repo {
   name: string; // "acme" or "acme/foo"
   path: string;
   description: string; // first para of CLAUDE.md/README.md
   git: GitInfo | null; // null = not a git repo
   docs: DocInfo[]; // present state docs, priority-ordered
+  plans?: PlanInfo[]; // plans/*.md gameplan progress, when plans/ is non-empty
   feedback: FeedbackInfo | null;
   sessions: SessionInfo;
   snuff: boolean;

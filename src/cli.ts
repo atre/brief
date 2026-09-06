@@ -22,7 +22,30 @@ export interface Args {
   refreshVisibility: boolean;
   refreshCi: boolean;
   noCi: boolean;
+  sections?: string[];
+  missing: boolean;
 }
+
+export const SECTIONS = [
+  'path',
+  'description',
+  'git',
+  'docs',
+  'feedback',
+  'sessions',
+  'snuff',
+  'gates',
+  'tokens7d',
+  'deadPaths',
+  'fatDocs',
+  'runtime',
+  'ci',
+  'visibility',
+  'lastSaid',
+  'score',
+  'reasons',
+  'plans',
+];
 
 export const HELP = `brief — cross-repo state radar
 
@@ -33,6 +56,7 @@ usage
   brief --hub [file]         diff discovered repos vs the hub CLAUDE.md table (default ~/git/hub/CLAUDE.md)
   brief --hub [file] --write append missing repos as rows above the "No index yet" row (curated rows untouched)
   brief feedback             untriaged FEEDBACK.md sections across all repos, with a preview line each (a FEEDBACK.md with no "## <date>" sections is ignored, not an error)
+  brief feedback --missing   git repos with no FEEDBACK.md at all
   brief feedback --public    only repos whose origin is a public GitHub repo (--private: the inverse; [local] = not git / no GitHub remote, excluded by both; --refresh-visibility re-asks gh, else cached 7d)
   brief feedback --headers   repo lines + section headers only, no preview lines — the cheap first call of a sweep (then --only <sub> for one repo with previews)
   brief feedback --lessons   "- lesson: …" bullets across all repos (any section, triaged or not)
@@ -50,6 +74,7 @@ flags
   --all              show quiet repos too
   --only <sub>       only repos whose name contains <sub>
   --json | --md      machine / markdown output
+  --section a,b     with --json: emit only these sections (repeatable)
   --tokens <n>       trim the handoff to roughly n tokens (default 1200)
   --stale <days>     stale-dirty threshold: dirty and no session in <days> (default 7)
   --gates            "brief <repo>" only: run snuff --json --changed and show a gates: line
@@ -85,6 +110,7 @@ export function parseArgs(argv: string[], home: string): Args {
     refreshVisibility: false,
     refreshCi: false,
     noCi: false,
+    missing: false,
   };
   let topGiven = false;
   const positional: string[] = [];
@@ -113,7 +139,8 @@ export function parseArgs(argv: string[], home: string): Args {
     } else if (x === '--private') {
       if (a.visibility && a.visibility !== 'private') throw new Error('use one of --public / --private');
       a.visibility = 'private';
-    } else if (x === '--refresh-visibility') a.refreshVisibility = true;
+    } else if (x === '--missing') a.missing = true;
+    else if (x === '--refresh-visibility') a.refreshVisibility = true;
     else if (x === '--refresh-ci') a.refreshCi = true;
     else if (x === '--no-ci') a.noCi = true;
     else if (x === '--next') a.next = true;
@@ -123,7 +150,15 @@ export function parseArgs(argv: string[], home: string): Args {
     else if (x === '--md') a.md = true;
     else if (x === '--tokens') a.tokens = Number(next()) || undefined;
     else if (x === '--stale') a.stale = Number(next()) || 7;
-    else if (x.startsWith('-')) throw new Error(`unknown flag ${x}`);
+    else if (x === '--section') {
+      for (const s of next()
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean)) {
+        if (!SECTIONS.includes(s)) throw new Error(`unknown section ${s} (valid: ${SECTIONS.join(', ')})`);
+        (a.sections ??= []).push(s);
+      }
+    } else if (x.startsWith('-')) throw new Error(`unknown flag ${x}`);
     else positional.push(x);
   }
   if (a.write && a.cmd !== 'hub') throw new Error('--write is only valid with --hub');
@@ -150,6 +185,9 @@ export function parseArgs(argv: string[], home: string): Args {
   if (a.gates && a.cmd !== 'repo') throw new Error('--gates is only valid for `brief <repo>`');
   if (a.lessons && a.cmd !== 'feedback') throw new Error('--lessons is only valid for `brief feedback`');
   if (a.headers && a.cmd !== 'feedback') throw new Error('--headers is only valid for `brief feedback`');
+  if (a.missing && a.cmd !== 'feedback') throw new Error('--missing is only valid for `brief feedback`');
+  if (a.sections && !a.json) throw new Error('--section needs --json');
+  if (a.sections && a.cmd !== 'radar' && a.cmd !== 'repo') throw new Error('--section is only valid for the radar and `brief <repo>`');
   if (a.next && a.cmd !== 'repo') throw new Error('--next is only valid for `brief <repo>`');
   if ((a.visibility || a.refreshVisibility) && a.cmd !== 'feedback')
     throw new Error('--public/--private/--refresh-visibility are only valid with `brief feedback`');

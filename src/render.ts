@@ -20,6 +20,19 @@ function isQuiet(r: Repo): boolean {
   return r.score === 0;
 }
 
+export function selectSections(r: Repo, sections: string[]): Partial<Repo> {
+  const out: Partial<Repo> = {};
+  for (const s of sections) {
+    const key = s as keyof Repo;
+    if (key in r) (out as Record<string, unknown>)[key] = r[key];
+  }
+  return out;
+}
+
+export function selectReport(rep: Report, sections: string[]): { root: string[]; now: number; repos: ({ name: string } & Partial<Repo>)[] } {
+  return { root: rep.root, now: rep.now, repos: rep.repos.map((r) => ({ name: r.name, ...selectSections(r, sections) })) };
+}
+
 export function renderText(rep: Report, opts: { top: number; all: boolean; brief?: boolean }): string {
   const { now } = rep;
   const repos = [...rep.repos].sort((a, b) => b.score - a.score || b.sessions.last - a.sessions.last);
@@ -104,6 +117,12 @@ export function renderRepo(r: Repo, now: number, budget: { files: number; commit
         .join(' · ')}`,
     );
   } else out.push('docs: none of STATE/STATUS/TODO/PLAN.md');
+  if (r.plans?.length) {
+    const open = r.plans.filter((p) => p.open > 0);
+    const done = r.plans.filter((p) => p.open === 0);
+    if (open.length) out.push(`plans: ${open.length} open (${open.map((p) => `${p.file} ${p.done}/${p.open + p.done}`).join(', ')})${done.length ? ` · ${done.length} done` : ''}`);
+    else out.push(`plans: ${done.length} done`);
+  }
   if (r.deadPaths.length) out.push(`dead paths: ${r.deadPaths.join(', ')}`);
   const primary = r.docs[0];
   if (primary?.nextHeadingMissing) out.push(`next (${primary.file}): nextHeading "${primary.nextHeadingMissing}" not found`);
@@ -200,7 +219,13 @@ export function renderLessonsMd(rep: Report): string {
   return out.join('\n');
 }
 
-export function renderFeedback(rep: Report, opts: { headers?: boolean } = {}): string {
+export function renderFeedback(rep: Report, opts: { headers?: boolean; missing?: boolean } = {}): string {
+  const missing = rep.repos.filter((r) => r.git !== null && r.feedback === null).sort((a, b) => a.name.localeCompare(b.name));
+  if (opts.missing) {
+    const out = [`feedback — ${missing.length} repo${missing.length === 1 ? '' : 's'} with no FEEDBACK.md`];
+    for (const r of missing) out.push(`${r.name}${r.visibility && r.visibility !== 'unknown' ? ` [${r.visibility}]` : ''} — ${r.path}`);
+    return out.join('\n');
+  }
   const withFb = rep.repos.filter((r) => r.feedback?.items.length).sort((a, b) => b.feedback!.items.length - a.feedback!.items.length);
   const total = withFb.reduce((n, r) => n + r.feedback!.items.length, 0);
   const out = [`feedback — ${total} untriaged sections in ${withFb.length} repos (after each repo's last "## <date> — triage" marker)`];
@@ -209,5 +234,6 @@ export function renderFeedback(rep: Report, opts: { headers?: boolean } = {}): s
     for (const it of r.feedback!.items) out.push(`  · ${it.header}${!opts.headers && it.preview ? `\n      ${it.preview}` : ''}`);
   }
   if (!withFb.length) out.push('nothing untriaged — every dated section sits above a triage marker');
+  if (missing.length) out.push(`${missing.length} repo${missing.length === 1 ? '' : 's'} with no FEEDBACK.md (brief feedback --missing)`);
   return out.join('\n');
 }

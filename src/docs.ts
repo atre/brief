@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { lastTouched, commitsSince } from './git.js';
-import type { DocInfo, FeedbackInfo, FeedbackSection } from './types.js';
+import type { DocInfo, FeedbackInfo, FeedbackSection, PlanInfo } from './types.js';
 
 /** State docs in priority order — the first one present drives "next". */
 export const STATE_DOCS = ['STATE.md', 'STATUS.md', 'TODO.md', 'PLAN.md', 'plan.md'];
@@ -125,6 +125,27 @@ export function deadPaths(dir: string, text: string, home = homedir()): string[]
     if (dead.length >= 5) break;
   }
   return dead;
+}
+
+/** `plans/*.md` gameplan progress, name order; missing dir → `[]`. Counts with the
+ *  same two regexes as `extractNext` (open `- [ ]`, done `- [x]`) — no heading/next parsing. */
+export function plansFor(dir: string): PlanInfo[] {
+  let files: string[];
+  try {
+    files = readdirSync(join(dir, 'plans')).filter((f) => f.endsWith('.md')).sort();
+  } catch {
+    return [];
+  }
+  return files.map((file) => {
+    const text = readIf(join(dir, 'plans', file)) ?? '';
+    let open = 0;
+    let done = 0;
+    for (const l of text.split('\n')) {
+      if (/^\s*[-*]\s+\[ \]/.test(l)) open++;
+      else if (/^\s*[-*]\s+\[[xX]\]/.test(l)) done++;
+    }
+    return { file, open, done };
+  });
 }
 
 /** Marks a PLAN/state doc as safe for an unattended agent to run top-down. */

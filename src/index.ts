@@ -5,7 +5,7 @@ import { existsSync, statSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve, basename, join } from 'node:path';
 import { parseArgs, HELP } from './cli.js';
 import { collect, collectOne, runSnuff } from './collect.js';
-import { renderText, renderRepo, renderMd, renderHub, renderFeedback, renderLessons, renderLessonsMd, renderQueue, renderDiff } from './render.js';
+import { renderText, renderRepo, renderMd, renderHub, renderFeedback, renderLessons, renderLessonsMd, renderQueue, renderDiff, selectSections, selectReport } from './render.js';
 import { buildQueue } from './queue.js';
 import { writeSnap, readSnap, toSnap, diffSnaps } from './snap.js';
 import { cmdInit } from './init.js';
@@ -66,7 +66,7 @@ async function main(): Promise<void> {
       noCi: args.noCi,
     });
     if (!repo) throw new Error(`${path} is ignored by its .brief.yaml`);
-    if (args.json) return void console.log(JSON.stringify(repo, null, 2));
+    if (args.json) return void console.log(JSON.stringify(args.sections ? selectSections(repo, args.sections) : repo, null, 2));
     const budget = budgetFor(args.tokens ?? 1200);
     return void console.log(renderRepo(repo, now, budget));
   }
@@ -98,6 +98,13 @@ async function main(): Promise<void> {
       if (args.json) return void console.log(JSON.stringify(rep.repos.flatMap((r) => r.feedback?.lessons.map((l) => ({ repo: r.name, ...l })) ?? []), null, 2));
       return void console.log(args.md ? renderLessonsMd(rep) : renderLessons(rep));
     }
+    if (args.missing) {
+      const missing = rep.repos.filter((r) => r.git !== null && r.feedback === null);
+      await attachVisibility(missing, { home: briefHome(), now, refresh: args.refreshVisibility });
+      const filtered = args.visibility ? missing.filter((r) => r.visibility === args.visibility) : missing;
+      if (args.json) return void console.log(JSON.stringify(filtered.map((r) => ({ name: r.name, path: r.path, visibility: r.visibility })), null, 2));
+      return void console.log(renderFeedback({ ...rep, repos: filtered }, { headers: args.headers, missing: true }));
+    }
     await attachVisibility(rep.repos.filter((r) => r.feedback?.items.length), { home: briefHome(), now, refresh: args.refreshVisibility });
     const view = { ...rep, repos: args.visibility ? rep.repos.filter((r) => r.visibility === args.visibility) : rep.repos };
     if (args.json)
@@ -118,7 +125,7 @@ async function main(): Promise<void> {
     }
     return void console.log(args.json ? JSON.stringify(diff, null, 2) : renderHub(diff));
   }
-  if (args.json) return void console.log(JSON.stringify(rep, null, 2));
+  if (args.json) return void console.log(JSON.stringify(args.sections ? selectReport(rep, args.sections) : rep, null, 2));
   if (args.md) return void console.log(renderMd(rep, args.top));
   console.log(renderText(rep, { top: args.top, all: args.all, brief: args.brief }));
 }
