@@ -127,8 +127,32 @@ export function deadPaths(dir: string, text: string, home = homedir()): string[]
   return dead;
 }
 
+const FENCE_RE = /^(`{3,}|~{3,})/;
+
+/** `text` split into lines, with any line inside a fenced code block (opened/closed by a
+ *  line whose first non-space chars are ``` or ~~~, any info string, any indentation) blanked
+ *  to `''` — including the fence marker lines themselves. Array length and index match
+ *  `text.split('\n')` exactly, so callers that report 1-indexed line numbers (`nextItem`) stay
+ *  correct; blanked lines never match a checkbox/bullet regex, so counting and "next item"
+ *  extraction skip fenced content for free. A `~~~` fence tolerates nested ``` (and vice versa)
+ *  without closing early, matching common markdown fence nesting. */
+export function unfencedLines(text: string): string[] {
+  let fenceChar: string | null = null;
+  return text.split('\n').map((raw) => {
+    const m = FENCE_RE.exec(raw.trimStart());
+    if (m) {
+      const ch = m[1][0];
+      if (fenceChar === null) fenceChar = ch;
+      else if (fenceChar === ch) fenceChar = null;
+      return '';
+    }
+    return fenceChar ? '' : raw;
+  });
+}
+
 /** `plans/*.md` gameplan progress, name order; missing dir → `[]`. Counts with the
- *  same two regexes as `extractNext` (open `- [ ]`, done `- [x]`) — no heading/next parsing. */
+ *  same two regexes as `extractNext` (open `- [ ]`, done `- [x]`) — no heading/next parsing.
+ *  Fenced code (spec text quoted in a plan, e.g.) is skipped via `unfencedLines`. */
 export function plansFor(dir: string): PlanInfo[] {
   let files: string[];
   try {
@@ -140,7 +164,7 @@ export function plansFor(dir: string): PlanInfo[] {
     const text = readIf(join(dir, 'plans', file)) ?? '';
     let open = 0;
     let done = 0;
-    for (const l of text.split('\n')) {
+    for (const l of unfencedLines(text)) {
       if (/^\s*[-*]\s+\[ \]/.test(l)) open++;
       else if (/^\s*[-*]\s+\[[xX]\]/.test(l)) done++;
     }
@@ -153,10 +177,10 @@ export function isAgentRunnable(text: string): boolean {
   return /How to run this plan/i.test(text);
 }
 
-/** First open PLAN item (1-indexed line), skipping a bare "- [ ] done" placeholder;
- *  continuation lines indented ≥ 2 spaces are folded into `text`. */
+/** First open PLAN item (1-indexed line), skipping a bare "- [ ] done" placeholder and any
+ *  fenced code (`unfencedLines`); continuation lines indented ≥ 2 spaces are folded into `text`. */
 export function nextItem(text: string): { line: number; text: string } | null {
-  const lines = text.split('\n');
+  const lines = unfencedLines(text);
   for (let i = 0; i < lines.length; i++) {
     if (!/^\s*[-*]\s+\[ \]\s+\S/.test(lines[i])) continue;
     if (/^- \[ \] done$/i.test(lines[i].trim())) continue;
@@ -227,9 +251,10 @@ export function headingCue(cue?: string): RegExp {
   return new RegExp(`^#{1,6}\\s+.*${esc}`, 'i');
 }
 
+/** Fenced code (`unfencedLines`) never counts toward open/done or gets picked as a next item. */
 export function extractNext(text: string, max = 5, headings: boolean | RegExp = true): { open: number; done: number; next: string[] } {
   const cue = headings instanceof RegExp ? headings : NEXT_HEADING;
-  const lines = text.split('\n');
+  const lines = unfencedLines(text);
   let open = 0;
   let done = 0;
   for (const l of lines) {
